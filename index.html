@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Mobility Check — Phase 1 MVP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F3EF;
+    --ink:#16211D;
+    --ink-soft:#5B655F;
+    --amber:#E8A33D;
+    --amber-deep:#C97F17;
+    --teal:#1F4C46;
+    --teal-soft:#E4EEEC;
+    --card:#FFFFFF;
+    --line:#DEDCD3;
+    --danger:#B4453A;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.num{font-family:'Space Grotesk',sans-serif;}
+  .frame{
+    width:100%;
+    max-width:430px;
+    min-height:100vh;
+    background:var(--card);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+  }
+  header.topbar{
+    padding:20px 22px 14px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+  }
+  header.topbar h1{font-size:19px;margin:0;font-weight:600;letter-spacing:-0.01em;}
+  header.topbar span{font-size:12px;color:var(--ink-soft);}
+  main{flex:1;padding:22px;display:flex;flex-direction:column;gap:18px;}
+  .screen{display:none;flex-direction:column;gap:18px;flex:1;}
+  .screen.active{display:flex;}
+
+  p.lead{font-size:14.5px;line-height:1.55;color:var(--ink-soft);margin:0;}
+
+  .exercise-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .exercise-card{
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 14px;
+    text-align:left;
+    background:var(--card);
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  .exercise-card:active{transform:scale(0.98);}
+  .exercise-card:hover{border-color:var(--teal);}
+  .exercise-card .glyph{font-size:22px;display:block;margin-bottom:10px;}
+  .exercise-card .name{font-weight:600;font-size:14.5px;display:block;}
+  .exercise-card .sub{font-size:12px;color:var(--ink-soft);display:block;margin-top:3px;}
+
+  .history-strip{
+    border-top:1px solid var(--line);
+    padding-top:16px;
+    margin-top:auto;
+  }
+  .history-strip h3{font-size:13px;margin:0 0 10px;font-weight:600;color:var(--ink-soft);}
+  .history-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;
+  }
+  .history-row:last-child{border-bottom:none;}
+  .history-row .hscore{font-family:'Space Grotesk',sans-serif;font-weight:600;color:var(--teal);}
+  .empty-hint{font-size:13px;color:var(--ink-soft);padding:6px 0;}
+
+  .cam-wrap{
+    position:relative;
+    border-radius:var(--radius);
+    overflow:hidden;
+    background:#0E0E0C;
+    aspect-ratio:3/4;
+    width:100%;
+  }
+  video.cam, canvas.overlay{
+    position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;
+  }
+  video.cam{ transform:scaleX(-1); }
+  canvas.overlay{ transform:scaleX(-1); }
+
+  .cam-badge{
+    position:absolute;top:12px;left:12px;
+    background:rgba(0,0,0,.55);color:#fff;font-size:12px;
+    padding:5px 10px;border-radius:20px;
+    font-family:'Inter',sans-serif;
+  }
+  .countdown-overlay{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(14,14,12,.35);color:#fff;font-size:64px;font-weight:700;
+    font-family:'Space Grotesk',sans-serif;
+  }
+  .progress-track{
+    height:6px;border-radius:6px;background:var(--line);overflow:hidden;
+  }
+  .progress-fill{
+    height:100%;width:0%;background:var(--amber);transition:width .1s linear;
+  }
+
+  .instructions{
+    background:var(--teal-soft);border-radius:var(--radius);
+    padding:14px 16px;font-size:13.5px;line-height:1.5;color:var(--teal);
+  }
+
+  .btn{
+    border:none;border-radius:14px;padding:14px 18px;font-size:15px;font-weight:600;
+    font-family:'Inter',sans-serif;cursor:pointer;text-align:center;
+  }
+  .btn-primary{background:var(--ink);color:#fff;}
+  .btn-primary:active{background:#0c1310;}
+  .btn-primary:disabled{background:#B9BDB9;cursor:not-allowed;}
+  .btn-outline{background:transparent;color:var(--ink);border:1px solid var(--line);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-row{display:flex;gap:10px;}
+  .btn-row .btn{flex:1;}
+
+  .result-hero{
+    display:flex;flex-direction:column;align-items:center;padding:8px 0 4px;
+  }
+  .ring-wrap{position:relative;width:180px;height:180px;}
+  .ring-wrap svg{transform:rotate(-90deg);}
+  .ring-num{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+  }
+  .ring-num .num{font-size:44px;font-weight:700;line-height:1;}
+  .ring-num .of100{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .result-label{font-size:16px;font-weight:600;margin-top:14px;}
+  .result-exercise{font-size:13px;color:var(--ink-soft);}
+
+  .feedback-card{
+    background:var(--bg);border-radius:var(--radius);padding:16px;
+    font-size:14px;line-height:1.55;border:1px solid var(--line);
+  }
+  .feedback-card strong{color:var(--teal);}
+
+  .bottom-nav{
+    display:flex;border-top:1px solid var(--line);
+  }
+  .bottom-nav button{
+    flex:1;border:none;background:none;padding:14px 0;font-family:'Inter',sans-serif;
+    font-size:12.5px;color:var(--ink-soft);cursor:pointer;
+  }
+  .bottom-nav button.active{color:var(--ink);font-weight:600;}
+
+  .status-msg{font-size:13px;color:var(--ink-soft);text-align:center;padding:10px 0;}
+  .back-link{
+    font-size:13px;color:var(--ink-soft);background:none;border:none;cursor:pointer;
+    padding:0;text-align:left;width:fit-content;
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <header class="topbar">
+    <h1>Mobility Check</h1>
+    <span id="topbarSub">phase 1 · prototype</span>
+  </header>
+
+  <main>
+
+    <!-- HOME / EXERCISE SELECT -->
+    <section class="screen active" id="screen-home">
+      <p class="lead">Pick a movement. Record 10 seconds on camera. Get a score and one thing to work on.</p>
+
+      <div class="exercise-grid" id="exerciseGrid"></div>
+
+      <div class="history-strip">
+        <h3>Recent sessions</h3>
+        <div id="historyList"><p class="empty-hint">No sessions yet — try your first exercise above.</p></div>
+      </div>
+    </section>
+
+    <!-- INSTRUCTIONS -->
+    <section class="screen" id="screen-instructions">
+      <button class="back-link" data-nav="screen-home">&larr; Back</button>
+      <h2 id="instrTitle" style="margin:0;font-size:20px;"></h2>
+      <div class="instructions" id="instrBody"></div>
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary" id="btnGoToCamera">Open camera</button>
+    </section>
+
+    <!-- CAMERA / RECORD -->
+    <section class="screen" id="screen-camera">
+      <button class="back-link" data-nav="screen-instructions">&larr; Back</button>
+      <div class="cam-wrap">
+        <video class="cam" id="video" playsinline muted></video>
+        <canvas class="overlay" id="overlay"></canvas>
+        <div class="cam-badge" id="camBadge">Loading model…</div>
+        <div class="countdown-overlay" id="countdownOverlay" style="display:none;"></div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <p class="status-msg" id="cameraStatus">Position yourself in frame, then start.</p>
+      <button class="btn btn-primary" id="btnStartRecording">Start (10s)</button>
+    </section>
+
+    <!-- RESULT -->
+    <section class="screen" id="screen-result">
+      <div class="result-hero">
+        <div class="ring-wrap">
+          <svg width="180" height="180">
+            <circle cx="90" cy="90" r="78" stroke="#DEDCD3" stroke-width="12" fill="none"/>
+            <circle id="scoreRing" cx="90" cy="90" r="78" stroke="#E8A33D" stroke-width="12" fill="none"
+              stroke-linecap="round" stroke-dasharray="490" stroke-dashoffset="490"/>
+          </svg>
+          <div class="ring-num">
+            <span class="num" id="scoreNum">–</span>
+            <span class="of100">out of 100</span>
+          </div>
+        </div>
+        <div class="result-label" id="resultLabel"></div>
+        <div class="result-exercise" id="resultExercise"></div>
+      </div>
+
+      <div class="feedback-card" id="feedbackCard"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" data-nav="screen-home">Done</button>
+        <button class="btn btn-primary" id="btnRetry">Try again</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script type="module">
+import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+/* ---------------------------------------------------------------------
+   1. EXERCISE DEFINITIONS
+   Each exercise defines: which landmarks it needs, a per-frame metric
+   function, whether we want the MAX or MIN of that metric across the
+   clip, and score bands mapped to feedback copy.
+   Landmark indices follow the standard 33-point MediaPipe pose model.
+--------------------------------------------------------------------- */
+const LM = {
+  nose:0, leftEar:7, rightEar:8,
+  leftShoulder:11, rightShoulder:12,
+  leftElbow:13, rightElbow:14,
+  leftWrist:15, rightWrist:16,
+  leftHip:23, rightHip:24,
+  leftKnee:25, rightKnee:26,
+  leftAnkle:27, rightAnkle:28,
+};
+
+function angleAt(b, a, c){
+  // angle at vertex b, formed by points a-b-c, in degrees
+  const v1 = {x:a.x-b.x, y:a.y-b.y};
+  const v2 = {x:c.x-b.x, y:c.y-b.y};
+  const dot = v1.x*v2.x + v1.y*v2.y;
+  const m1 = Math.hypot(v1.x, v1.y), m2 = Math.hypot(v2.x, v2.y);
+  if(m1===0||m2===0) return null;
+  const cos = Math.min(1, Math.max(-1, dot/(m1*m2)));
+  return Math.acos(cos) * 180/Math.PI;
+}
+function mid(a,b){ return {x:(a.x+b.x)/2, y:(a.y+b.y)/2}; }
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+const EXERCISES = {
+  squat: {
+    name: "Squat depth",
+    glyph: "⌇",
+    instructions: "Stand side-on or slightly angled to the camera, full body in frame. Squat down and back up once, at a comfortable depth. We'll measure your knee angle at the bottom.",
+    requiredLandmarks: [LM.leftHip, LM.leftKnee, LM.leftAnkle, LM.rightHip, LM.rightKnee, LM.rightAnkle],
+    // returns a per-frame value; we track the aggregate ("best") across frames
+    aggregate: "min", // smaller knee angle = deeper squat = better mobility
+    frameMetric(lms){
+      const l = angleAt(lms[LM.leftKnee], lms[LM.leftHip], lms[LM.leftAnkle]);
+      const r = angleAt(lms[LM.rightKnee], lms[LM.rightHip], lms[LM.rightAnkle]);
+      const vals = [l,r].filter(v=>v!==null);
+      if(!vals.length) return null;
+      return Math.min(...vals); // deepest side
+    },
+    bands: [
+      {max:95,  score:96, label:"Excellent range", note:"Your knee angle at the bottom of the squat was under 95°. That's a strong, full squat depth for a desk-bound routine."},
+      {max:115, score:80, label:"Good range",       note:"Solid depth. A few minutes of hip and ankle mobility work most days can help you sit a little lower over time."},
+      {max:135, score:62, label:"Moderate range",   note:"You're stopping fairly high. Tight hips or ankles from sitting are the usual cause — try calf and hip-flexor stretches."},
+      {max:999, score:42, label:"Limited range",    note:"Your squat is quite shallow right now. This is common after long sitting hours and is very trainable with consistent mobility work."},
+    ],
+  },
+  shoulder: {
+    name: "Shoulder reach",
+    glyph: "↑",
+    instructions: "Face the camera, upper body and arms visible. Raise one arm straight overhead as high as comfortable, then lower it. We'll measure how high your arm travels relative to your torso.",
+    requiredLandmarks: [LM.leftHip, LM.leftShoulder, LM.leftWrist, LM.rightHip, LM.rightShoulder, LM.rightWrist],
+    aggregate: "max", // bigger angle = arm closer to fully overhead = better mobility
+    frameMetric(lms){
+      const l = angleAt(lms[LM.leftShoulder], lms[LM.leftHip], lms[LM.leftWrist]);
+      const r = angleAt(lms[LM.rightShoulder], lms[LM.rightHip], lms[LM.rightWrist]);
+      const vals = [l,r].filter(v=>v!==null);
+      if(!vals.length) return null;
+      return Math.max(...vals);
+    },
+    bands: [
+      {min:160, score:95, label:"Excellent range", note:"Your arm travelled close to fully overhead. That's a strong shoulder range for typical desk-related stiffness."},
+      {min:135, score:78, label:"Good range",       note:"Good reach. Doorway chest stretches and overhead reaches through the day can help close the last bit of range."},
+      {min:105, score:60, label:"Moderate range",   note:"Your reach stopped a bit short — common with rounded shoulders from long typing sessions."},
+      {min:-1,  score:40, label:"Limited range",    note:"Your overhead reach is quite restricted right now. Gentle daily shoulder mobility work should open this up steadily."},
+    ],
+  },
+  trunk: {
+    name: "Trunk rotation",
+    glyph: "↺",
+    instructions: "Face the camera square-on, seated or standing, shoulders and hips visible. Rotate your upper body to one side as far as comfortable, then back to center. We'll measure how much your shoulders turn away from the camera.",
+    requiredLandmarks: [LM.leftShoulder, LM.rightShoulder],
+    aggregate: "min", // smaller shoulder-width ratio = more turned away = more rotation
+    frameMetric(lms, restingWidth){
+      const w = dist(lms[LM.leftShoulder], lms[LM.rightShoulder]);
+      if(!restingWidth || restingWidth===0) return null;
+      return w / restingWidth;
+    },
+    needsBaseline: true, // uses the first ~1s of frames as the "facing camera" resting width
+    bands: [
+      {max:0.55, score:94, label:"Excellent range", note:"Your shoulders turned a long way from square-on — strong rotational mobility through your spine."},
+      {max:0.70, score:76, label:"Good range",       note:"Decent rotation. Seated spinal twists a few times a day can help extend this further."},
+      {max:0.85, score:58, label:"Moderate range",   note:"Your rotation is somewhat limited — very common with hours of forward-facing desk posture."},
+      {max:2,    score:40, label:"Limited range",    note:"Very little rotation was detected. This is one of the first things to loosen up with regular spinal mobility work."},
+    ],
+  },
+  neck: {
+    name: "Neck turn",
+    glyph: "⟲",
+    instructions: "Face the camera square-on, head and shoulders visible. Turn your head to one side as far as comfortable, then back to center. We'll measure how far your nose travels relative to your shoulders.",
+    requiredLandmarks: [LM.nose, LM.leftShoulder, LM.rightShoulder],
+    aggregate: "max",
+    frameMetric(lms){
+      const shoulderMid = mid(lms[LM.leftShoulder], lms[LM.rightShoulder]);
+      const shoulderWidth = dist(lms[LM.leftShoulder], lms[LM.rightShoulder]);
+      if(shoulderWidth===0) return null;
+      return Math.abs(lms[LM.nose].x - shoulderMid.x) / shoulderWidth;
+    },
+    bands: [
+      {min:0.50, score:93, label:"Excellent range", note:"Your head turned well past your shoulder line — strong neck mobility."},
+      {min:0.35, score:77, label:"Good range",       note:"Good turn. A few slow neck rotations during breaks can extend this a little further."},
+      {min:0.20, score:59, label:"Moderate range",   note:"Your turn is somewhat limited — common with screen-forward posture held for hours."},
+      {min:-1,   score:40, label:"Limited range",    note:"Very little neck rotation was detected. Gentle daily neck stretches should help this move quickly."},
+    ],
+  },
+};
+
+/* ---------------------------------------------------------------------
+   2. NAVIGATION
+--------------------------------------------------------------------- */
+const screens = document.querySelectorAll(".screen");
+function showScreen(id){
+  screens.forEach(s=>s.classList.toggle("active", s.id===id));
+}
+document.querySelectorAll("[data-nav]").forEach(el=>{
+  el.addEventListener("click", ()=>{
+    const leavingCamera = document.getElementById("screen-camera").classList.contains("active");
+    if(leavingCamera) stopCamera();
+    showScreen(el.dataset.nav);
+  });
+});
+
+/* ---------------------------------------------------------------------
+   3. HOME SCREEN — build exercise grid + history
+--------------------------------------------------------------------- */
+let sessionHistory = []; // in-memory only for this prototype — swap for
+                          // Firestore in Phase 1.5 so history persists
+                          // across visits and across devices.
+let currentExerciseKey = null;
+
+const grid = document.getElementById("exerciseGrid");
+Object.entries(EXERCISES).forEach(([key, ex])=>{
+  const card = document.createElement("button");
+  card.className = "exercise-card";
+  card.innerHTML = `<span class="glyph">${ex.glyph}</span><span class="name">${ex.name}</span><span class="sub">~10 second check</span>`;
+  card.addEventListener("click", ()=> openInstructions(key));
+  grid.appendChild(card);
+});
+
+function renderHistory(){
+  const list = document.getElementById("historyList");
+  if(sessionHistory.length===0){
+    list.innerHTML = `<p class="empty-hint">No sessions yet — try your first exercise above.</p>`;
+    return;
+  }
+  list.innerHTML = sessionHistory.slice(-5).reverse().map(h=>`
+    <div class="history-row">
+      <span>${h.name}</span>
+      <span class="hscore">${h.score}</span>
+    </div>
+  `).join("");
+}
+
+function openInstructions(key){
+  currentExerciseKey = key;
+  const ex = EXERCISES[key];
+  document.getElementById("instrTitle").textContent = ex.name;
+  document.getElementById("instrBody").textContent = ex.instructions;
+  showScreen("screen-instructions");
+}
+
+/* ---------------------------------------------------------------------
+   4. CAMERA + POSE MODEL
+--------------------------------------------------------------------- */
+const video = document.getElementById("video");
+const overlay = document.getElementById("overlay");
+const ctx = overlay.getContext("2d");
+const camBadge = document.getElementById("camBadge");
+const cameraStatus = document.getElementById("cameraStatus");
+const btnStart = document.getElementById("btnStartRecording");
+const progressFill = document.getElementById("progressFill");
+const countdownOverlay = document.getElementById("countdownOverlay");
+
+let poseLandmarker = null;
+let stream = null;
+let rafId = null;
+let modelReady = false;
+
+// simplified skeleton connections for drawing
+const CONNECTIONS = [
+  [11,12],[11,13],[13,15],[12,14],[14,16],
+  [11,23],[12,24],[23,24],
+  [23,25],[25,27],[24,26],[26,28],
+  [0,11],[0,12],
+];
+
+async function initModel(){
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  );
+  poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+      delegate: "GPU",
+    },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  });
+  modelReady = true;
+}
+initModel().catch(err=>{
+  console.error(err);
+  camBadge.textContent = "Model failed to load — check connection";
+});
+
+async function startCamera(){
+  camBadge.textContent = modelReady ? "Ready" : "Loading model…";
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:"user" }, audio:false });
+  video.srcObject = stream;
+  await video.play();
+  await new Promise(resolve=>{
+    if(video.videoWidth){ resolve(); return; }
+    video.addEventListener("loadedmetadata", resolve, { once:true });
+  });
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+  loopDetect();
+}
+function stopCamera(){
+  if(rafId) cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+}
+
+let latestLandmarks = null;
+function loopDetect(){
+  if(poseLandmarker && video.readyState >= 2){
+    const res = poseLandmarker.detectForVideo(video, performance.now());
+    latestLandmarks = res.landmarks && res.landmarks[0] ? res.landmarks[0] : null;
+    drawOverlay(latestLandmarks);
+    camBadge.textContent = latestLandmarks ? "Tracking" : "Step into frame";
+  }
+  rafId = requestAnimationFrame(loopDetect);
+}
+function drawOverlay(lms){
+  ctx.clearRect(0,0,overlay.width, overlay.height);
+  if(!lms) return;
+  ctx.strokeStyle = "#E8A33D";
+  ctx.lineWidth = 3;
+  CONNECTIONS.forEach(([a,b])=>{
+    const p1=lms[a], p2=lms[b];
+    if(!p1||!p2) return;
+    ctx.beginPath();
+    ctx.moveTo(p1.x*overlay.width, p1.y*overlay.height);
+    ctx.lineTo(p2.x*overlay.width, p2.y*overlay.height);
+    ctx.stroke();
+  });
+  ctx.fillStyle = "#1F4C46";
+  lms.forEach(p=>{
+    ctx.beginPath();
+    ctx.arc(p.x*overlay.width, p.y*overlay.height, 4, 0, Math.PI*2);
+    ctx.fill();
+  });
+}
+
+document.getElementById("btnGoToCamera").addEventListener("click", async ()=>{
+  showScreen("screen-camera");
+  cameraStatus.textContent = "Position yourself in frame, then start.";
+  progressFill.style.width = "0%";
+  try{
+    await startCamera();
+  }catch(err){
+    cameraStatus.textContent = "Camera access was blocked. Allow camera permission and reload.";
+  }
+});
+
+/* ---------------------------------------------------------------------
+   5. RECORDING + SCORING
+--------------------------------------------------------------------- */
+const RECORD_SECONDS = 10;
+btnStart.addEventListener("click", runCountdownThenRecord);
+
+function runCountdownThenRecord(){
+  btnStart.disabled = true;
+  let n = 3;
+  countdownOverlay.style.display = "flex";
+  countdownOverlay.textContent = n;
+  const tick = setInterval(()=>{
+    n -= 1;
+    if(n>0){ countdownOverlay.textContent = n; }
+    else{
+      clearInterval(tick);
+      countdownOverlay.style.display = "none";
+      recordExercise();
+    }
+  }, 700);
+}
+
+function recordExercise(){
+  const ex = EXERCISES[currentExerciseKey];
+  const samples = [];
+  let baselineWidth = null;
+  let baselineFrames = [];
+  const startTime = performance.now();
+  cameraStatus.textContent = "Recording — move now.";
+
+  const interval = setInterval(()=>{
+    const elapsed = (performance.now() - startTime)/1000;
+    progressFill.style.width = Math.min(100, (elapsed/RECORD_SECONDS)*100) + "%";
+
+    if(latestLandmarks){
+      // collect baseline (resting, facing-camera) shoulder width during
+      // the first ~1 second for exercises that need a reference value
+      if(ex.needsBaseline && elapsed < 1){
+        baselineFrames.push(dist(latestLandmarks[LM.leftShoulder], latestLandmarks[LM.rightShoulder]));
+      }
+      if(ex.needsBaseline && baselineWidth===null && baselineFrames.length>5){
+        baselineWidth = baselineFrames.reduce((a,b)=>a+b,0)/baselineFrames.length;
+      }
+      const val = ex.frameMetric(latestLandmarks, baselineWidth);
+      if(val!==null) samples.push(val);
+    }
+
+    if(elapsed >= RECORD_SECONDS){
+      clearInterval(interval);
+      finishRecording(samples);
+    }
+  }, 100);
+}
+
+function finishRecording(samples){
+  btnStart.disabled = false;
+  cameraStatus.textContent = "Done.";
+  if(samples.length < 5){
+    cameraStatus.textContent = "Couldn't track you clearly — try again with better lighting and full-body framing.";
+    progressFill.style.width = "0%";
+    return;
+  }
+  const ex = EXERCISES[currentExerciseKey];
+  const aggregateValue = ex.aggregate==="min" ? Math.min(...samples) : Math.max(...samples);
+  const band = ex.bands.find(b=>{
+    if(b.max!==undefined) return aggregateValue <= b.max;
+    if(b.min!==undefined) return aggregateValue >= b.min;
+    return false;
+  }) || ex.bands[ex.bands.length-1];
+
+  showResult(ex, band);
+}
+
+function showResult(ex, band){
+  stopCamera();
+  document.getElementById("scoreNum").textContent = band.score;
+  document.getElementById("resultLabel").textContent = band.label;
+  document.getElementById("resultExercise").textContent = ex.name;
+  document.getElementById("feedbackCard").innerHTML = `<strong>${band.label}.</strong> ${band.note}`;
+
+  const ring = document.getElementById("scoreRing");
+  const circumference = 2*Math.PI*78;
+  const offset = circumference * (1 - band.score/100);
+  ring.style.strokeDasharray = circumference;
+  ring.style.strokeDashoffset = offset;
+
+  sessionHistory.push({ name: ex.name, score: band.score, ts: Date.now() });
+  renderHistory();
+  showScreen("screen-result");
+}
+
+document.getElementById("btnRetry").addEventListener("click", async ()=>{
+  showScreen("screen-camera");
+  progressFill.style.width = "0%";
+  cameraStatus.textContent = "Position yourself in frame, then start.";
+  try{ await startCamera(); }catch(e){ cameraStatus.textContent = "Camera access was blocked."; }
+});
+
+renderHistory();
+</script>
+</body>
+</html>
