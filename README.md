@@ -29,22 +29,6 @@ people actually record themselves and come back for a score?**
    intentionally, to keep this file dependency-free. Wire up Firebase
    (or any backend) once you're past validation.
 
-## Running it
-
-This needs a **local server or HTTPS host** — browsers block camera
-access on `file://` pages and on plain HTTP.
-
-Easiest local option:
-```
-cd path/to/folder
-npx serve .
-```
-Then open the printed `localhost` URL on your phone or laptop (both work;
-phone is the real target device).
-
-To test with real users without building an app: deploy this single file
-to any static host (Vercel, Netlify, GitHub Pages all work with zero
-config) and share the link. HTTPS is provided automatically by all three.
 
 ## Known limitations (intentional, for this phase)
 
