@@ -72,7 +72,8 @@
   }
   .exercise-card:active{transform:scale(0.98);}
   .exercise-card:hover{border-color:var(--teal);}
-  .exercise-card .glyph{font-size:22px;display:block;margin-bottom:10px;}
+  .exercise-card .ex-icon{width:44px;height:44px;display:block;margin-bottom:10px;}
+  .exercise-card .ex-icon svg{width:100%;height:100%;display:block;}
   .exercise-card .name{font-weight:600;font-size:14.5px;display:block;}
   .exercise-card .sub{font-size:12px;color:var(--ink-soft);display:block;margin-top:3px;}
 
@@ -126,6 +127,17 @@
     background:var(--teal-soft);border-radius:var(--radius);
     padding:14px 16px;font-size:13.5px;line-height:1.5;color:var(--teal);
   }
+  .instr-icon{width:132px;height:132px;margin:2px auto 0;}
+  .instr-icon svg{width:100%;height:100%;display:block;}
+  .duration-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .duration-row .duration-label{font-size:12.5px;color:var(--ink-soft);}
+  .duration-pills{display:flex;gap:6px;}
+  .duration-pill{
+    border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+    font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;
+    padding:6px 12px;border-radius:20px;cursor:pointer;
+  }
+  .duration-pill.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 
   .btn{
     border:none;border-radius:14px;padding:14px 18px;font-size:15px;font-weight:600;
@@ -202,7 +214,12 @@
     <section class="screen" id="screen-instructions">
       <button class="back-link" data-nav="screen-home">&larr; Back</button>
       <h2 id="instrTitle" style="margin:0;font-size:20px;"></h2>
+      <div class="instr-icon" id="instrIcon"></div>
       <div class="instructions" id="instrBody"></div>
+      <div class="duration-row">
+        <span class="duration-label">Recording length</span>
+        <div class="duration-pills" id="durationPills"></div>
+      </div>
       <div style="flex:1;"></div>
       <button class="btn btn-primary" id="btnGoToCamera">Open camera</button>
     </section>
@@ -287,6 +304,8 @@ const EXERCISES = {
   squat: {
     name: "Squat depth",
     glyph: "⌇",
+    category: "For hip & ankle range",
+    duration: 12,
     instructions: "Stand side-on or slightly angled to the camera, full body in frame. Squat down and back up once, at a comfortable depth. We'll measure your knee angle at the bottom.",
     requiredLandmarks: [LM.leftHip, LM.leftKnee, LM.leftAnkle, LM.rightHip, LM.rightKnee, LM.rightAnkle],
     // returns a per-frame value; we track the aggregate ("best") across frames
@@ -308,6 +327,8 @@ const EXERCISES = {
   shoulder: {
     name: "Shoulder reach",
     glyph: "↑",
+    category: "For shoulder mobility",
+    duration: 12,
     instructions: "Face the camera, upper body and arms visible. Raise one arm straight overhead as high as comfortable, then lower it. We'll measure how high your arm travels relative to your torso.",
     requiredLandmarks: [LM.leftHip, LM.leftShoulder, LM.leftWrist, LM.rightHip, LM.rightShoulder, LM.rightWrist],
     aggregate: "max", // bigger angle = arm closer to fully overhead = better mobility
@@ -328,6 +349,8 @@ const EXERCISES = {
   trunk: {
     name: "Trunk rotation",
     glyph: "↺",
+    category: "For rotational control",
+    duration: 12,
     instructions: "Face the camera square-on, seated or standing, shoulders and hips visible. Rotate your upper body to one side as far as comfortable, then back to center. We'll measure how much your shoulders turn away from the camera.",
     requiredLandmarks: [LM.leftShoulder, LM.rightShoulder],
     aggregate: "min", // smaller shoulder-width ratio = more turned away = more rotation
@@ -347,6 +370,8 @@ const EXERCISES = {
   neck: {
     name: "Neck turn",
     glyph: "⟲",
+    category: "For neck mobility",
+    duration: 10,
     instructions: "Face the camera square-on, head and shoulders visible. Turn your head to one side as far as comfortable, then back to center. We'll measure how far your nose travels relative to your shoulders.",
     requiredLandmarks: [LM.nose, LM.leftShoulder, LM.rightShoulder],
     aggregate: "max",
@@ -363,6 +388,151 @@ const EXERCISES = {
       {min:-1,   score:40, label:"Limited range",    note:"Very little neck rotation was detected. Gentle daily neck stretches should help this move quickly."},
     ],
   },
+  balance: {
+    name: "Single-leg balance",
+    glyph: "◐",
+    category: "For stability & asymmetry",
+    duration: 25,
+    instructions: "Stand facing the camera, full body visible, arms free at your sides. Lift one foot off the floor and hold your balance for the full recording — don't worry if you wobble, that's exactly what we're measuring.",
+    requiredLandmarks: [LM.leftHip, LM.rightHip],
+    aggregate: "range", // smaller range of hip drift = steadier balance
+    frameMetric(lms){
+      const hipMid = mid(lms[LM.leftHip], lms[LM.rightHip]);
+      const hipWidth = dist(lms[LM.leftHip], lms[LM.rightHip]);
+      if(hipWidth===0) return null;
+      return hipMid.x / hipWidth; // scale-normalized horizontal drift
+    },
+    bands: [
+      {max:0.05, score:95, label:"Excellent stability", note:"Very little drift while balancing — strong single-leg control and low asymmetry between sides."},
+      {max:0.09, score:78, label:"Good stability",       note:"Fairly steady. A little wobble is completely normal — short daily single-leg holds build this quickly."},
+      {max:0.15, score:60, label:"Moderate stability",   note:"Noticeable wobble was detected. This is common with a sedentary routine and improves fast with practice."},
+      {max:99,   score:40, label:"Limited stability",    note:"Significant drift while balancing. Worth building single-leg holds into your routine a few times a week."},
+    ],
+  },
+  hinge: {
+    name: "Forward reach / hinge",
+    glyph: "⌐",
+    category: "For posterior chain & control",
+    duration: 15,
+    instructions: "Stand side-on to the camera, full body visible. Hinge forward at your hips, reaching your hands toward your toes as far as comfortable, then return to standing. We'll measure how far you're able to fold forward.",
+    requiredLandmarks: [LM.leftShoulder, LM.leftHip, LM.leftKnee, LM.rightShoulder, LM.rightHip, LM.rightKnee],
+    aggregate: "min", // smaller hip angle = deeper forward fold
+    frameMetric(lms){
+      const l = angleAt(lms[LM.leftHip], lms[LM.leftShoulder], lms[LM.leftKnee]);
+      const r = angleAt(lms[LM.rightHip], lms[LM.rightShoulder], lms[LM.rightKnee]);
+      const vals = [l,r].filter(v=>v!==null);
+      if(!vals.length) return null;
+      return Math.min(...vals);
+    },
+    bands: [
+      {max:85,  score:95, label:"Excellent range", note:"You folded a long way forward at the hips — strong posterior chain flexibility and control."},
+      {max:105, score:78, label:"Good range",       note:"Solid fold. Hamstring and lower-back stretches a few times a week can extend this further."},
+      {max:125, score:60, label:"Moderate range",   note:"Your fold stopped fairly early — common with tight hamstrings from long sitting hours."},
+      {max:999, score:40, label:"Limited range",    note:"Your forward fold is quite limited right now. Gentle hamstring and hip-hinge practice should open this up steadily."},
+    ],
+  },
+  readiness: {
+    name: "Position & readiness",
+    glyph: "⏚",
+    category: "For body position & recovery",
+    duration: 10,
+    instructions: "Stand slightly side-on to the camera in your normal, relaxed standing position — don't try to correct yourself, just stand naturally. Hold still for the recording. We'll check how your head and shoulders line up over your hips.",
+    requiredLandmarks: [LM.leftEar, LM.leftShoulder, LM.leftHip],
+    aggregate: "avg", // steady hold, so we average across the clip rather than take a peak
+    frameMetric(lms){
+      const torsoLength = dist(lms[LM.leftShoulder], lms[LM.leftHip]);
+      if(torsoLength===0) return null;
+      return Math.abs(lms[LM.leftEar].x - lms[LM.leftShoulder].x) / torsoLength;
+    },
+    bands: [
+      {max:0.15, score:93, label:"Well aligned",       note:"Your ear sits close to stacked over your shoulder — good resting posture, low forward-head lean."},
+      {max:0.28, score:76, label:"Mostly aligned",      note:"A slight forward-head lean was detected — very common after long screen sessions, easy to work on."},
+      {max:0.42, score:58, label:"Some forward lean",   note:"A moderate forward-head lean was detected. Chin tucks and upper-back strengthening tend to help here."},
+      {max:99,   score:40, label:"Notable forward lean",note:"A significant forward-head lean was detected — worth addressing with regular posture breaks and upper-back work."},
+    ],
+  },
+};
+
+/* ---------------------------------------------------------------------
+   1b. MOVEMENT ILLUSTRATIONS
+   Simple original line-art stick figures (no photos/stock assets) so the
+   app stays a single dependency-free file. Each is a full SVG string,
+   reused at small size on the exercise cards and large size on the
+   instructions screen via CSS, not fixed pixel attributes.
+--------------------------------------------------------------------- */
+const ICONS = {
+  squat: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <circle cx="60" cy="27" r="9" fill="#16211D"/>
+    <path d="M60,36 L56,60" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M56,60 L40,76 M56,60 L74,76" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M40,76 L44,101 M74,76 L70,101" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M58,42 L36,50 M58,42 L80,50" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M92,44 L92,80" stroke="#E8A33D" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowDown)"/>
+    <defs><marker id="arrowDown" markerWidth="8" markerHeight="8" refX="4" refY="6" orient="auto">
+      <path d="M0,0 L4,7 L8,0 Z" fill="#E8A33D"/></marker></defs>
+  </svg>`,
+  shoulder: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <circle cx="60" cy="27" r="9" fill="#16211D"/>
+    <path d="M60,36 L60,70" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60,70 L50,104 M60,70 L70,104" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M60,42 L48,66" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M60,40 L60,12" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M78,42 L78,14" stroke="#E8A33D" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowUp)"/>
+    <defs><marker id="arrowUp" markerWidth="8" markerHeight="8" refX="4" refY="1" orient="auto">
+      <path d="M0,7 L4,0 L8,7 Z" fill="#E8A33D"/></marker></defs>
+  </svg>`,
+  trunk: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <circle cx="60" cy="27" r="9" fill="#16211D"/>
+    <path d="M60,36 L60,70" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M46,40 L74,36" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M46,40 L32,46 M74,36 L88,42" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M48,70 L72,70" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60,70 L52,104 M60,70 L68,104" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M34,54 A26,26 0 0,1 86,54" stroke="#E8A33D" stroke-width="3" fill="none" stroke-linecap="round" marker-end="url(#arrowCurve)"/>
+    <defs><marker id="arrowCurve" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#E8A33D"/></marker></defs>
+  </svg>`,
+  neck: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <circle cx="60" cy="27" r="9" fill="#16211D"/>
+    <path d="M67,24 L76,21" stroke="#16211D" stroke-width="3" stroke-linecap="round"/>
+    <path d="M44,42 L76,42" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60,42 L60,70" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M50,70 L70,70" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60,70 L52,104 M60,70 L68,104" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M46,13 A18,10 0 0,1 78,14" stroke="#E8A33D" stroke-width="3" fill="none" stroke-linecap="round" marker-end="url(#arrowCurve2)"/>
+    <defs><marker id="arrowCurve2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#E8A33D"/></marker></defs>
+  </svg>`,
+  balance: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <circle cx="60" cy="27" r="9" fill="#16211D"/>
+    <path d="M60,36 L60,64" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60,64 L58,104" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60,64 L75,78 L69,66" stroke="#16211D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M60,42 L38,50 M60,42 L82,50" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M34,106 Q40,101 46,106 M70,106 Q76,101 82,106" stroke="#E8A33D" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </svg>`,
+  hinge: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <circle cx="32" cy="42" r="9" fill="#16211D"/>
+    <path d="M38,48 L62,72" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M62,72 L58,104 M62,72 L68,104" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M38,54 L48,96" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M30,104 L84,104" stroke="#E8A33D" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 6"/>
+  </svg>`,
+  readiness: `<svg viewBox="0 0 120 120">
+    <rect x="4" y="4" width="112" height="112" rx="20" fill="#E4EEEC"/>
+    <line x1="44" y1="16" x2="52" y2="110" stroke="#E8A33D" stroke-width="2" stroke-dasharray="4 4"/>
+    <circle cx="44" cy="26" r="9" fill="#16211D"/>
+    <path d="M45,35 L48,68" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M48,68 L50,104" stroke="#16211D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M46,42 L38,62" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M48,44 L58,64" stroke="#16211D" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </svg>`,
 };
 
 /* ---------------------------------------------------------------------
@@ -392,7 +562,7 @@ const grid = document.getElementById("exerciseGrid");
 Object.entries(EXERCISES).forEach(([key, ex])=>{
   const card = document.createElement("button");
   card.className = "exercise-card";
-  card.innerHTML = `<span class="glyph">${ex.glyph}</span><span class="name">${ex.name}</span><span class="sub">~10 second check</span>`;
+  card.innerHTML = `<span class="ex-icon">${ICONS[key]}</span><span class="name">${ex.name}</span><span class="sub">${ex.category}</span>`;
   card.addEventListener("click", ()=> openInstructions(key));
   grid.appendChild(card);
 });
@@ -411,12 +581,44 @@ function renderHistory(){
   `).join("");
 }
 
+const DURATION_OPTIONS = [10, 20, 30];
+let selectedDuration = 10;
+
 function openInstructions(key){
   currentExerciseKey = key;
   const ex = EXERCISES[key];
   document.getElementById("instrTitle").textContent = ex.name;
+  document.getElementById("instrIcon").innerHTML = ICONS[key];
   document.getElementById("instrBody").textContent = ex.instructions;
+
+  // default to this exercise's recommended duration, snapped to the
+  // nearest available pill (10 / 20 / 30s)
+  selectedDuration = DURATION_OPTIONS.reduce((closest, opt)=>
+    Math.abs(opt-ex.duration) < Math.abs(closest-ex.duration) ? opt : closest
+  );
+  renderDurationPills();
   showScreen("screen-instructions");
+}
+
+function renderDurationPills(){
+  const wrap = document.getElementById("durationPills");
+  wrap.innerHTML = "";
+  DURATION_OPTIONS.forEach(sec=>{
+    const pill = document.createElement("button");
+    pill.className = "duration-pill" + (sec===selectedDuration ? " active" : "");
+    pill.textContent = sec + "s";
+    pill.addEventListener("click", ()=>{
+      selectedDuration = sec;
+      renderDurationPills();
+      updateStartButtonLabel();
+    });
+    wrap.appendChild(pill);
+  });
+  updateStartButtonLabel();
+}
+function updateStartButtonLabel(){
+  const btn = document.getElementById("btnStartRecording");
+  if(btn) btn.textContent = `Start (${selectedDuration}s)`;
 }
 
 /* ---------------------------------------------------------------------
@@ -525,8 +727,10 @@ document.getElementById("btnGoToCamera").addEventListener("click", async ()=>{
 
 /* ---------------------------------------------------------------------
    5. RECORDING + SCORING
+   Recording length is chosen per exercise on the instructions screen
+   (10 / 20 / 30s) via selectedDuration — movements like a quick squat
+   need less time than a sustained balance hold.
 --------------------------------------------------------------------- */
-const RECORD_SECONDS = 10;
 btnStart.addEventListener("click", runCountdownThenRecord);
 
 function runCountdownThenRecord(){
@@ -555,7 +759,7 @@ function recordExercise(){
 
   const interval = setInterval(()=>{
     const elapsed = (performance.now() - startTime)/1000;
-    progressFill.style.width = Math.min(100, (elapsed/RECORD_SECONDS)*100) + "%";
+    progressFill.style.width = Math.min(100, (elapsed/selectedDuration)*100) + "%";
 
     if(latestLandmarks){
       // collect baseline (resting, facing-camera) shoulder width during
@@ -570,11 +774,21 @@ function recordExercise(){
       if(val!==null) samples.push(val);
     }
 
-    if(elapsed >= RECORD_SECONDS){
+    if(elapsed >= selectedDuration){
       clearInterval(interval);
       finishRecording(samples);
     }
   }, 100);
+}
+
+function computeAggregate(ex, samples){
+  switch(ex.aggregate){
+    case "min":   return Math.min(...samples);
+    case "max":   return Math.max(...samples);
+    case "range": return Math.max(...samples) - Math.min(...samples);
+    case "avg":   return samples.reduce((a,b)=>a+b, 0) / samples.length;
+    default:      return Math.max(...samples);
+  }
 }
 
 function finishRecording(samples){
@@ -586,7 +800,7 @@ function finishRecording(samples){
     return;
   }
   const ex = EXERCISES[currentExerciseKey];
-  const aggregateValue = ex.aggregate==="min" ? Math.min(...samples) : Math.max(...samples);
+  const aggregateValue = computeAggregate(ex, samples);
   const band = ex.bands.find(b=>{
     if(b.max!==undefined) return aggregateValue <= b.max;
     if(b.min!==undefined) return aggregateValue >= b.min;
