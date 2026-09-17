@@ -78,6 +78,8 @@
   .exercise-card .name{font-weight:600;font-size:14.5px;display:block;}
   .exercise-card .sub{font-size:12px;color:var(--ink-soft);display:block;margin-top:3px;}
   .exercise-card .best-badge{display:block;margin-top:6px;font-size:11px;font-weight:600;color:var(--teal);min-height:14px;}
+  .dim-tag{display:block;margin-top:4px;font-size:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--amber-deep);}
+  #instrDimTag.dim-tag{margin-top:-8px;}
 
   .history-strip{
     border-top:1px solid var(--line);
@@ -267,6 +269,7 @@
     <section class="screen" id="screen-instructions">
       <button class="back-link" data-nav="screen-home">&larr; Back</button>
       <h2 id="instrTitle" style="margin:0;font-size:20px;"></h2>
+      <span class="dim-tag" id="instrDimTag"></span>
       <div class="instr-icon" id="instrIcon"></div>
       <div class="instructions" id="instrBody"></div>
       <div class="duration-row">
@@ -347,6 +350,14 @@
         </div>
 
         <div class="feedback-card" id="recommendationCard"></div>
+
+        <div class="breakdown-card">
+          <h3>Mobility dimensions</h3>
+          <p class="lead">Your checks rolled up into 5 movement-quality dimensions, so you know what kind of work to prioritize.</p>
+          <div id="dimensionList"></div>
+        </div>
+
+        <div class="feedback-card" id="dimensionRecommendationCard"></div>
 
         <div class="breakdown-card">
           <h3>Per-check breakdown</h3>
@@ -722,6 +733,84 @@ function getRecommendation(bestScores){
   return html;
 }
 
+/* ---------------------------------------------------------------------
+   1d. FIVE MOVEMENT-QUALITY DIMENSIONS — Move / Align / Stability /
+   Control / Recovery
+   Each of the 7 checks rolls up into one or more of these 5 dimensions,
+   so users get a coarser "where to focus" view alongside the granular
+   per-check scores. The mapping below follows each check's own
+   `category` copy in EXERCISES above (e.g. squat's category literally
+   says "range", trunk's and hinge's say "control", balance's says
+   "stability", readiness's says "position & recovery") rather than
+   inventing a separate taxonomy:
+     - Move       (range of motion):  squat, shoulder, neck
+     - Align      (postural position): readiness
+     - Stability  (steadiness):        balance
+     - Control    (controlled, symmetric motion): trunk, hinge
+     - Recovery   (resting readiness):  readiness
+   Recovery has no dedicated check today — readiness is the closest
+   proxy available (its own copy names "recovery" explicitly) and feeds
+   both Align and Recovery until a dedicated recovery signal (rest-day
+   balance, self-reported soreness, sleep, etc.) is added — see README.
+--------------------------------------------------------------------- */
+const DIMENSIONS = {
+  move:      { label:"Move",      blurb:"Range of motion — how far you can move through your hips, shoulders and neck.", keys:["squat","shoulder","neck"] },
+  align:     { label:"Align",     blurb:"How well your body is positioned and stacked, both at rest and in motion.", keys:["readiness"] },
+  stability: { label:"Stability", blurb:"How steady you stay under an unstable, single-limb position.", keys:["balance"] },
+  control:   { label:"Control",   blurb:"How controlled and symmetric your movement is through a range — not just how far it goes.", keys:["trunk","hinge"] },
+  recovery:  { label:"Recovery",  blurb:"A proxy for resting readiness, currently drawn from your Position & readiness check.", keys:["readiness"] },
+};
+const DIMENSION_ORDER = ["move","align","stability","control","recovery"];
+
+// Reverse lookup used to tag each exercise card/instructions screen with
+// the dimension(s) it feeds.
+const EXERCISE_TO_DIMENSIONS = {};
+DIMENSION_ORDER.forEach(dimKey=>{
+  DIMENSIONS[dimKey].keys.forEach(exKey=>{
+    (EXERCISE_TO_DIMENSIONS[exKey] = EXERCISE_TO_DIMENSIONS[exKey] || []).push(DIMENSIONS[dimKey].label);
+  });
+});
+
+// Per-dimension weighted score, built the same way as the overall score
+// (best-of-repeats, renormalized across whichever of the dimension's
+// checks are actually done) but scoped to just that dimension's checks.
+// Returns null for a dimension with zero completed checks.
+function computeDimensionScores(bestScores){
+  const result = {};
+  DIMENSION_ORDER.forEach(dimKey=>{
+    const dim = DIMENSIONS[dimKey];
+    const availableKeys = dim.keys.filter(k=>bestScores[k]);
+    if(!availableKeys.length){ result[dimKey] = null; return; }
+    const totalWeight = availableKeys.reduce((s,k)=> s+(SCORE_WEIGHTS[k]||0), 0);
+    const weighted = availableKeys.reduce((s,k)=> s + (SCORE_WEIGHTS[k]/totalWeight) * bestScores[k].score, 0);
+    const weakestKey = availableKeys.reduce((a,b)=> bestScores[a].score <= bestScores[b].score ? a : b);
+    result[dimKey] = {
+      score: Math.round(weighted),
+      checksCompleted: availableKeys.length,
+      totalChecks: dim.keys.length,
+      weakestKey,
+    };
+  });
+  return result;
+}
+
+function getDimensionRecommendation(dimensionScores, bestScores){
+  const available = DIMENSION_ORDER.filter(k=>dimensionScores[k]);
+  if(!available.length) return "";
+  const weakestDim = available.reduce((a,b)=> dimensionScores[a].score <= dimensionScores[b].score ? a : b);
+  const dim = DIMENSIONS[weakestDim];
+  const info = dimensionScores[weakestDim];
+  const driverEx = EXERCISES[info.weakestKey];
+  const driverScore = bestScores[info.weakestKey];
+  let html = `<strong>Focus dimension: ${dim.label} (${info.score}).</strong> ${dim.blurb} Right now it's held back most by ${driverEx.name} (${driverScore.score}) — ${driverScore.band.note}`;
+  const notDone = DIMENSION_ORDER.filter(k=>!dimensionScores[k]);
+  if(notDone.length){
+    const names = notDone.map(k=>DIMENSIONS[k].label).join(", ");
+    html += `<br/><br/>Not enough data yet for: ${names}. Completing their underlying check(s) will unlock those dimension scores.`;
+  }
+  return html;
+}
+
 function dateKey(ts){
   const d = new Date(ts);
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -863,7 +952,7 @@ const grid = document.getElementById("exerciseGrid");
 Object.entries(EXERCISES).forEach(([key, ex])=>{
   const card = document.createElement("button");
   card.className = "exercise-card";
-  card.innerHTML = `<span class="ex-icon">${ICONS[key]}</span><span class="name">${ex.name}</span><span class="sub">${ex.category}</span><span class="best-badge" id="badge-${key}"></span>`;
+  card.innerHTML = `<span class="ex-icon">${ICONS[key]}</span><span class="name">${ex.name}</span><span class="sub">${ex.category}</span><span class="dim-tag">${EXERCISE_TO_DIMENSIONS[key].join(" · ")}</span><span class="best-badge" id="badge-${key}"></span>`;
   card.addEventListener("click", ()=> openInstructions(key));
   grid.appendChild(card);
 });
@@ -899,6 +988,7 @@ function openInstructions(key){
   currentExerciseKey = key;
   const ex = EXERCISES[key];
   document.getElementById("instrTitle").textContent = ex.name;
+  document.getElementById("instrDimTag").textContent = EXERCISE_TO_DIMENSIONS[key].join(" · ");
   document.getElementById("instrIcon").innerHTML = ICONS[key];
   document.getElementById("instrBody").textContent = ex.instructions;
 
@@ -1192,6 +1282,27 @@ function renderBreakdown(bestScores, totalWeight){
   }).join("");
 }
 
+function renderDimensions(dimensionScores){
+  const list = document.getElementById("dimensionList");
+  list.innerHTML = DIMENSION_ORDER.map(dimKey=>{
+    const dim = DIMENSIONS[dimKey];
+    const info = dimensionScores[dimKey];
+    if(!info){
+      const needed = dim.keys.map(k=>EXERCISES[k].name).join(", ");
+      return `<div class="breakdown-row breakdown-missing">
+        <span class="breakdown-name">${dim.label}</span>
+        <span class="breakdown-missing-tag">Try: ${needed}</span>
+      </div>`;
+    }
+    return `<div class="breakdown-row">
+      <span class="breakdown-name">${dim.label}</span>
+      <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="width:${info.score}%;"></div></div>
+      <span class="breakdown-score">${info.score}</span>
+      <span class="breakdown-weight">${info.checksCompleted}/${info.totalChecks}</span>
+    </div>`;
+  }).join("");
+}
+
 let chartMode = "daily";
 function renderChartRangeToggle(){
   const wrap = document.getElementById("chartRangeToggle");
@@ -1319,6 +1430,10 @@ function renderScoreScreen(){
 
     document.getElementById("recommendationCard").innerHTML = getRecommendation(bestScores);
 
+    const dimensionScores = computeDimensionScores(bestScores);
+    renderDimensions(dimensionScores);
+    document.getElementById("dimensionRecommendationCard").innerHTML = getDimensionRecommendation(dimensionScores, bestScores);
+
     renderBreakdown(bestScores, result.totalWeight);
     renderChartRangeToggle();
     updateChart();
@@ -1393,16 +1508,16 @@ checkReminderState();
      }
 --------------------------------------------------------------------- */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyDLu_RBQi0mVpQHs9X85eXp_kgXelpV7mk",
+  authDomain: "kinelab-mobility-check.firebaseapp.com",
+  projectId: "kinelab-mobility-check",
+  storageBucket: "kinelab-mobility-check.firebasestorage.app",
+  messagingSenderId: "719661859403",
+  appId: "1:719661859403:web:cc88d0280891fd56b403ce",
 };
 const FIREBASE_ENABLED = !!(firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("YOUR_"));
 
-let fbApp=null, fbAuth=null, fbDb=null, fbUser=null, fbModules=null;
+let fbApp=null, fbAuth=null, fbDb=null, fbUser=null, fbModules=null, fbInitFailed=false;
 
 async function initFirebase(){
   if(!FIREBASE_ENABLED) return;
@@ -1430,6 +1545,8 @@ async function initFirebase(){
     }
   }catch(err){
     console.warn("Firebase init failed — continuing in local-only mode.", err);
+    fbInitFailed = true;
+    renderAuthCard();
   }
 }
 
@@ -1489,6 +1606,10 @@ function renderAuthCard(){
   if(!card) return;
   if(!FIREBASE_ENABLED){
     card.innerHTML = `<p class="empty-hint">Saving on this device only. Add a Firebase config near the bottom of index.html to sync history across devices and enable Google sign-in.</p>`;
+    return;
+  }
+  if(fbInitFailed){
+    card.innerHTML = `<p class="empty-hint">Couldn't reach Firebase right now (offline, or a network/config issue) — saving on this device only. Your history isn't lost; it'll sync next time Firebase is reachable.</p>`;
     return;
   }
   if(!fbUser){
