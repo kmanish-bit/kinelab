@@ -69,6 +69,7 @@
     cursor:pointer;
     font-family:'Inter',sans-serif;
     transition:border-color .15s ease, transform .1s ease;
+    position:relative;
   }
   .exercise-card:active{transform:scale(0.98);}
   .exercise-card:hover{border-color:var(--teal);}
@@ -76,6 +77,9 @@
   .exercise-card .ex-icon svg{width:100%;height:100%;display:block;}
   .exercise-card .name{font-weight:600;font-size:14.5px;display:block;}
   .exercise-card .sub{font-size:12px;color:var(--ink-soft);display:block;margin-top:3px;}
+  .exercise-card .best-badge{display:block;margin-top:6px;font-size:11px;font-weight:600;color:var(--teal);min-height:14px;}
+  .dim-tag{display:block;margin-top:4px;font-size:10px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--amber-deep);}
+  #instrDimTag.dim-tag{margin-top:-8px;}
 
   .history-strip{
     border-top:1px solid var(--line);
@@ -185,6 +189,49 @@
     font-size:13px;color:var(--ink-soft);background:none;border:none;cursor:pointer;
     padding:0;text-align:left;width:fit-content;
   }
+
+  /* ---- Mobility Score screen ---- */
+  .score-top-row{display:flex;align-items:center;justify-content:space-between;}
+  .score-top-row h2{margin:0;font-size:20px;}
+  .streak-chip{font-size:12px;font-weight:600;color:var(--amber-deep);background:#FBF1DE;padding:4px 10px;border-radius:20px;}
+  .streak-chip:empty{display:none;}
+
+  .locked-card{display:flex;flex-direction:column;gap:14px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+  .progress-dots{display:flex;gap:8px;flex-wrap:wrap;}
+  .progress-dot{width:14px;height:14px;border-radius:50%;background:var(--line);display:inline-block;}
+  .progress-dot.done{background:var(--teal);}
+
+  .badge-verdict{display:inline-block;margin-top:12px;padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;}
+  .badge-excellent{background:#E4EEEC;color:#1F4C46;}
+  .badge-very-good{background:#E7F2EA;color:#2E6F53;}
+  .badge-doing-good{background:#FBF1DE;color:#C97F17;}
+  .badge-needs-work{background:#F7E7E4;color:#B4453A;}
+
+  .breakdown-card, .chart-card{border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+  .breakdown-card h3, .chart-card h3{margin:0 0 4px;font-size:14px;}
+  .breakdown-card .lead{margin-bottom:10px;}
+  .breakdown-row{display:grid;grid-template-columns:1.2fr 1.4fr auto auto;align-items:center;gap:8px;padding:7px 0;font-size:12.5px;border-bottom:1px solid var(--line);}
+  .breakdown-row:last-child{border-bottom:none;}
+  .breakdown-name{font-weight:600;}
+  .breakdown-bar-track{height:6px;border-radius:6px;background:var(--line);overflow:hidden;}
+  .breakdown-bar-fill{height:100%;background:var(--teal);}
+  .breakdown-score{font-family:'Space Grotesk',sans-serif;font-weight:600;text-align:right;}
+  .breakdown-weight{color:var(--ink-soft);text-align:right;font-size:11.5px;}
+  .breakdown-missing{grid-template-columns:1fr auto;opacity:.6;}
+  .breakdown-missing-tag{font-size:11.5px;color:var(--ink-soft);}
+
+  .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .chart-header h3{margin:0;}
+  .chart-wrap{position:relative;}
+  .chart-tooltip{position:absolute;transform:translate(-50%,-115%);background:var(--ink);color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;pointer-events:none;white-space:nowrap;z-index:2;}
+  .chart-dot{cursor:pointer;}
+
+  .reminder-banner{display:flex;flex-direction:column;gap:8px;background:var(--teal-soft);border-radius:var(--radius);padding:14px 16px;font-size:13px;color:var(--teal);}
+  .reminder-actions{display:flex;gap:14px;}
+  .reminder-actions button{border:none;background:none;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;color:var(--teal);cursor:pointer;padding:0;}
+
+  .auth-card{margin-top:2px;}
+  .link-btn{border:none;background:none;color:var(--teal);font-weight:600;font-size:inherit;cursor:pointer;padding:0;text-decoration:underline;font-family:inherit;}
 </style>
 </head>
 <body>
@@ -193,13 +240,21 @@
 
   <header class="topbar">
     <h1>Mobility Check</h1>
-    <span id="topbarSub">phase 1 · prototype</span>
+    <span id="topbarSub">score · sync · reminders</span>
   </header>
 
   <main>
 
     <!-- HOME / EXERCISE SELECT -->
     <section class="screen active" id="screen-home">
+      <div class="reminder-banner" id="reminderBanner" style="display:none;">
+        <span id="reminderText"></span>
+        <div class="reminder-actions">
+          <button id="reminderDismiss">Dismiss</button>
+          <button id="reminderEnableNotif">Enable reminders</button>
+        </div>
+      </div>
+
       <p class="lead">Pick a movement. Record 10 seconds on camera. Get a score and one thing to work on.</p>
 
       <div class="exercise-grid" id="exerciseGrid"></div>
@@ -214,6 +269,7 @@
     <section class="screen" id="screen-instructions">
       <button class="back-link" data-nav="screen-home">&larr; Back</button>
       <h2 id="instrTitle" style="margin:0;font-size:20px;"></h2>
+      <span class="dim-tag" id="instrDimTag"></span>
       <div class="instr-icon" id="instrIcon"></div>
       <div class="instructions" id="instrBody"></div>
       <div class="duration-row">
@@ -264,11 +320,81 @@
       </div>
     </section>
 
+    <!-- MOBILITY SCORE -->
+    <section class="screen" id="screen-score">
+      <div class="score-top-row">
+        <h2>Mobility Score</h2>
+        <span class="streak-chip" id="streakChip"></span>
+      </div>
+
+      <div class="locked-card" id="scoreLockedState" style="display:none;">
+        <p class="lead">Complete <strong id="checksNeededNum">4</strong> more check(s) to unlock your Mobility Score. It's calculated from your best score on each check you've completed so far.</p>
+        <div class="progress-dots" id="progressDots"></div>
+      </div>
+
+      <div id="scoreUnlockedState" style="display:none;flex-direction:column;gap:18px;">
+        <div class="result-hero">
+          <div class="ring-wrap">
+            <svg width="180" height="180">
+              <circle cx="90" cy="90" r="78" stroke="#DEDCD3" stroke-width="12" fill="none"/>
+              <circle id="overallScoreRing" cx="90" cy="90" r="78" stroke="#1F4C46" stroke-width="12" fill="none"
+                stroke-linecap="round" stroke-dasharray="490" stroke-dashoffset="490"/>
+            </svg>
+            <div class="ring-num">
+              <span class="num" id="overallScoreNum">–</span>
+              <span class="of100">out of 100</span>
+            </div>
+          </div>
+          <span class="badge-verdict" id="verdictBadge"></span>
+          <div class="result-exercise" id="checksCompletedNote"></div>
+        </div>
+
+        <div class="feedback-card" id="recommendationCard"></div>
+
+        <div class="breakdown-card">
+          <h3>Mobility dimensions</h3>
+          <p class="lead">Your checks rolled up into 5 movement-quality dimensions, so you know what kind of work to prioritize.</p>
+          <div id="dimensionList"></div>
+        </div>
+
+        <div class="feedback-card" id="dimensionRecommendationCard"></div>
+
+        <div class="breakdown-card">
+          <h3>Per-check breakdown</h3>
+          <p class="lead">Best score per check, weighted by how much it reflects everyday mobility. Weights automatically rebalance around whichever checks you've done.</p>
+          <div id="breakdownList"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3>Trend</h3>
+            <div class="duration-pills" id="chartRangeToggle"></div>
+          </div>
+          <div class="chart-wrap" id="chartWrap"></div>
+        </div>
+      </div>
+
+      <div class="auth-card" id="authCard"></div>
+    </section>
+
   </main>
+
+  <nav class="bottom-nav" id="bottomNav">
+    <button data-tab="screen-home" class="active">Checks</button>
+    <button data-tab="screen-score">Score</button>
+  </nav>
+
 </div>
 
 <script type="module">
-import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+/* NOTE: the pose-detection library is imported lazily inside initModel()
+   below, not as a static top-level import. A static top-level import
+   that fails (offline, CDN blocked by a firewall, ad-blocker, etc.)
+   would abort this entire module — taking navigation, the Mobility
+   Score screen, history and charts down with it, even though none of
+   those need the camera. Loading it dynamically means a camera/model
+   failure only degrades the recording feature; everything else still
+   works. */
 
 /* ---------------------------------------------------------------------
    1. EXERCISE DEFINITIONS
@@ -536,11 +662,244 @@ const ICONS = {
 };
 
 /* ---------------------------------------------------------------------
+   1c. MOBILITY SCORE MODEL
+   Weighted overall score across the 7 checks. Weights reflect how much
+   each check contributes to "everyday mobility" (squat/hinge/balance
+   weighted a little higher — they're the biggest levers for daily
+   function — shoulder/trunk in the middle, neck/readiness lighter).
+   When fewer than 7 checks are done, weights are renormalized across
+   whichever checks the user *has* completed, so the score always sums
+   to 100% of what's available rather than penalizing missing checks.
+--------------------------------------------------------------------- */
+const SCORE_WEIGHTS = {
+  squat: 0.18,
+  hinge: 0.16,
+  balance: 0.16,
+  shoulder: 0.14,
+  trunk: 0.14,
+  readiness: 0.12,
+  neck: 0.10,
+};
+const MIN_CHECKS_FOR_SCORE = 4;
+const TOTAL_CHECKS = Object.keys(EXERCISES).length;
+
+const VERDICT_BANDS = [
+  { min:85, key:"excellent",   label:"Excellent",    color:"#1F4C46" },
+  { min:70, key:"very-good",   label:"Very Good",    color:"#2E6F53" },
+  { min:50, key:"doing-good",  label:"Doing Good",   color:"#C97F17" },
+  { min:0,  key:"needs-work",  label:"Need to Work", color:"#B4453A" },
+];
+
+// Best score per exercise across all history (repeats only count once, at their best).
+function getBestScores(history){
+  const best = {};
+  history.forEach(s=>{
+    if(!s.key || !EXERCISES[s.key]) return;
+    const current = best[s.key];
+    if(!current || s.score > current.score || (s.score===current.score && s.ts > current.ts)){
+      best[s.key] = s;
+    }
+  });
+  return best;
+}
+
+// Weighted mobility score from a best-scores map. Returns null if fewer
+// than MIN_CHECKS_FOR_SCORE distinct checks have been completed.
+function computeMobilityScore(bestScores){
+  const keys = Object.keys(bestScores);
+  if(keys.length < MIN_CHECKS_FOR_SCORE) return null;
+  const totalWeight = keys.reduce((sum,k)=> sum + (SCORE_WEIGHTS[k]||0), 0);
+  if(totalWeight<=0) return null;
+  const weighted = keys.reduce((sum,k)=> sum + (SCORE_WEIGHTS[k]/totalWeight) * bestScores[k].score, 0);
+  return { score: Math.round(weighted), checksCompleted: keys.length, totalWeight };
+}
+
+function getVerdict(score){
+  return VERDICT_BANDS.find(b=> score >= b.min) || VERDICT_BANDS[VERDICT_BANDS.length-1];
+}
+
+function getRecommendation(bestScores){
+  const keys = Object.keys(bestScores);
+  if(!keys.length) return "";
+  const weakestKey = keys.reduce((a,b)=> bestScores[a].score <= bestScores[b].score ? a : b);
+  const weakest = bestScores[weakestKey];
+  const ex = EXERCISES[weakestKey];
+  let html = `<strong>Focus area: ${ex.name}.</strong> ${weakest.band.note}`;
+  const missing = Object.keys(EXERCISES).filter(k=>!bestScores[k]);
+  if(missing.length){
+    const names = missing.map(k=>EXERCISES[k].name).join(", ");
+    html += `<br/><br/>You haven't tried ${missing.length===1 ? "this yet: " : "these yet: "}${names}. Completing ${missing.length===1?"it":"them"} will sharpen how accurate your overall score is.`;
+  }
+  return html;
+}
+
+/* ---------------------------------------------------------------------
+   1d. FIVE MOVEMENT-QUALITY DIMENSIONS — Move / Align / Stability /
+   Control / Recovery
+   Each of the 7 checks rolls up into one or more of these 5 dimensions,
+   so users get a coarser "where to focus" view alongside the granular
+   per-check scores. The mapping below follows each check's own
+   `category` copy in EXERCISES above (e.g. squat's category literally
+   says "range", trunk's and hinge's say "control", balance's says
+   "stability", readiness's says "position & recovery") rather than
+   inventing a separate taxonomy:
+     - Move       (range of motion):  squat, shoulder, neck
+     - Align      (postural position): readiness
+     - Stability  (steadiness):        balance
+     - Control    (controlled, symmetric motion): trunk, hinge
+     - Recovery   (resting readiness):  readiness
+   Recovery has no dedicated check today — readiness is the closest
+   proxy available (its own copy names "recovery" explicitly) and feeds
+   both Align and Recovery until a dedicated recovery signal (rest-day
+   balance, self-reported soreness, sleep, etc.) is added — see README.
+--------------------------------------------------------------------- */
+const DIMENSIONS = {
+  move:      { label:"Move",      blurb:"Range of motion — how far you can move through your hips, shoulders and neck.", keys:["squat","shoulder","neck"] },
+  align:     { label:"Align",     blurb:"How well your body is positioned and stacked, both at rest and in motion.", keys:["readiness"] },
+  stability: { label:"Stability", blurb:"How steady you stay under an unstable, single-limb position.", keys:["balance"] },
+  control:   { label:"Control",   blurb:"How controlled and symmetric your movement is through a range — not just how far it goes.", keys:["trunk","hinge"] },
+  recovery:  { label:"Recovery",  blurb:"A proxy for resting readiness, currently drawn from your Position & readiness check.", keys:["readiness"] },
+};
+const DIMENSION_ORDER = ["move","align","stability","control","recovery"];
+
+// Reverse lookup used to tag each exercise card/instructions screen with
+// the dimension(s) it feeds.
+const EXERCISE_TO_DIMENSIONS = {};
+DIMENSION_ORDER.forEach(dimKey=>{
+  DIMENSIONS[dimKey].keys.forEach(exKey=>{
+    (EXERCISE_TO_DIMENSIONS[exKey] = EXERCISE_TO_DIMENSIONS[exKey] || []).push(DIMENSIONS[dimKey].label);
+  });
+});
+
+// Per-dimension weighted score, built the same way as the overall score
+// (best-of-repeats, renormalized across whichever of the dimension's
+// checks are actually done) but scoped to just that dimension's checks.
+// Returns null for a dimension with zero completed checks.
+function computeDimensionScores(bestScores){
+  const result = {};
+  DIMENSION_ORDER.forEach(dimKey=>{
+    const dim = DIMENSIONS[dimKey];
+    const availableKeys = dim.keys.filter(k=>bestScores[k]);
+    if(!availableKeys.length){ result[dimKey] = null; return; }
+    const totalWeight = availableKeys.reduce((s,k)=> s+(SCORE_WEIGHTS[k]||0), 0);
+    const weighted = availableKeys.reduce((s,k)=> s + (SCORE_WEIGHTS[k]/totalWeight) * bestScores[k].score, 0);
+    const weakestKey = availableKeys.reduce((a,b)=> bestScores[a].score <= bestScores[b].score ? a : b);
+    result[dimKey] = {
+      score: Math.round(weighted),
+      checksCompleted: availableKeys.length,
+      totalChecks: dim.keys.length,
+      weakestKey,
+    };
+  });
+  return result;
+}
+
+function getDimensionRecommendation(dimensionScores, bestScores){
+  const available = DIMENSION_ORDER.filter(k=>dimensionScores[k]);
+  if(!available.length) return "";
+  const weakestDim = available.reduce((a,b)=> dimensionScores[a].score <= dimensionScores[b].score ? a : b);
+  const dim = DIMENSIONS[weakestDim];
+  const info = dimensionScores[weakestDim];
+  const driverEx = EXERCISES[info.weakestKey];
+  const driverScore = bestScores[info.weakestKey];
+  let html = `<strong>Focus dimension: ${dim.label} (${info.score}).</strong> ${dim.blurb} Right now it's held back most by ${driverEx.name} (${driverScore.score}) — ${driverScore.band.note}`;
+  const notDone = DIMENSION_ORDER.filter(k=>!dimensionScores[k]);
+  if(notDone.length){
+    const names = notDone.map(k=>DIMENSIONS[k].label).join(", ");
+    html += `<br/><br/>Not enough data yet for: ${names}. Completing their underlying check(s) will unlock those dimension scores.`;
+  }
+  return html;
+}
+
+function dateKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function formatShortDate(ts){
+  return new Date(ts).toLocaleDateString(undefined, { month:"short", day:"numeric" });
+}
+function formatMonthLabel(monthKeyStr){
+  const [y,m] = monthKeyStr.split("-").map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString(undefined, { month:"short", year:"numeric" });
+}
+function isoWeekMonday(ts){
+  const d = new Date(ts);
+  d.setHours(0,0,0,0);
+  const day = (d.getDay()+6)%7; // 0=Mon..6=Sun
+  d.setDate(d.getDate()-day);
+  return d;
+}
+function monthKeyOf(ts){
+  const d = new Date(ts);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+}
+
+// One score per calendar day the user did at least one check — computed
+// from the cumulative best scores up to (and including) that day. This
+// is what "daily average" plots — since it's already a single per-day
+// figure, weekly/monthly views average these daily figures together.
+function computeDailySnapshots(history){
+  if(!history.length) return [];
+  const sorted = [...history].sort((a,b)=>a.ts-b.ts);
+  const dayKeys = [...new Set(sorted.map(s=>dateKey(s.ts)))].sort();
+  const snapshots = [];
+  dayKeys.forEach(dk=>{
+    const [y,m,d] = dk.split("-").map(Number);
+    const cutoff = new Date(y, m-1, d, 23,59,59,999).getTime();
+    const upTo = sorted.filter(s=>s.ts<=cutoff);
+    const best = getBestScores(upTo);
+    const result = computeMobilityScore(best);
+    if(result) snapshots.push({ dateKey:dk, ts:cutoff, score:result.score });
+  });
+  return snapshots;
+}
+
+function aggregateSnapshots(daily, mode){
+  if(mode==="daily"){
+    return daily.map(d=>({ label: formatShortDate(d.ts), score: d.score, ts: d.ts }));
+  }
+  const groups = new Map();
+  daily.forEach(d=>{
+    const key = mode==="weekly" ? isoWeekMonday(d.ts).getTime() : monthKeyOf(d.ts);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d.score);
+  });
+  const entries = [...groups.entries()].sort((a,b)=> (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return entries.map(([key, scores])=>{
+    const avg = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+    if(mode==="weekly") return { label:"Wk "+formatShortDate(key), score:avg, ts:key };
+    return { label: formatMonthLabel(key), score:avg, ts: new Date(key+"-01").getTime() };
+  });
+}
+
+function computeStreak(history){
+  if(!history.length) return 0;
+  const days = new Set(history.map(s=>dateKey(s.ts)));
+  let streak = 0;
+  const cursor = new Date();
+  if(!days.has(dateKey(cursor.getTime()))){
+    cursor.setDate(cursor.getDate()-1);
+  }
+  while(days.has(dateKey(cursor.getTime()))){
+    streak++;
+    cursor.setDate(cursor.getDate()-1);
+  }
+  return streak;
+}
+
+/* ---------------------------------------------------------------------
    2. NAVIGATION
 --------------------------------------------------------------------- */
 const screens = document.querySelectorAll(".screen");
 function showScreen(id){
   screens.forEach(s=>s.classList.toggle("active", s.id===id));
+  const nav = document.getElementById("bottomNav");
+  if(nav){
+    const showNav = id==="screen-home" || id==="screen-score";
+    nav.style.display = showNav ? "flex" : "none";
+    nav.querySelectorAll("button").forEach(b=> b.classList.toggle("active", b.dataset.tab===id));
+  }
+  if(id==="screen-score") renderScoreScreen();
 }
 document.querySelectorAll("[data-nav]").forEach(el=>{
   el.addEventListener("click", ()=>{
@@ -549,23 +908,63 @@ document.querySelectorAll("[data-nav]").forEach(el=>{
     showScreen(el.dataset.nav);
   });
 });
+document.querySelectorAll("#bottomNav [data-tab]").forEach(btn=>{
+  btn.addEventListener("click", ()=> showScreen(btn.dataset.tab));
+});
 
 /* ---------------------------------------------------------------------
    3. HOME SCREEN — build exercise grid + history
+   Session history is persisted to localStorage (see PERSISTENCE below)
+   so it survives reloads, and mirrored to Firestore when Firebase is
+   configured and the user is signed in (see FIREBASE below).
 --------------------------------------------------------------------- */
-let sessionHistory = []; // in-memory only for this prototype — swap for
-                          // Firestore in Phase 1.5 so history persists
-                          // across visits and across devices.
+const STORAGE_KEY = "kinelab_mobility_v1";
+function loadStoredData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return { sessions: [], lastReminderNotifiedTs: null };
+    const parsed = JSON.parse(raw);
+    return {
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      lastReminderNotifiedTs: parsed.lastReminderNotifiedTs || null,
+    };
+  }catch(e){
+    console.warn("Could not read local history, starting fresh.", e);
+    return { sessions: [], lastReminderNotifiedTs: null };
+  }
+}
+let storedData = loadStoredData();
+let sessionHistory = storedData.sessions; // full history, every session kept (dedup happens at read-time via getBestScores)
 let currentExerciseKey = null;
+
+function persist(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      sessions: sessionHistory,
+      lastReminderNotifiedTs: storedData.lastReminderNotifiedTs,
+    }));
+  }catch(e){
+    console.warn("Could not persist history to localStorage.", e);
+  }
+}
 
 const grid = document.getElementById("exerciseGrid");
 Object.entries(EXERCISES).forEach(([key, ex])=>{
   const card = document.createElement("button");
   card.className = "exercise-card";
-  card.innerHTML = `<span class="ex-icon">${ICONS[key]}</span><span class="name">${ex.name}</span><span class="sub">${ex.category}</span>`;
+  card.innerHTML = `<span class="ex-icon">${ICONS[key]}</span><span class="name">${ex.name}</span><span class="sub">${ex.category}</span><span class="dim-tag">${EXERCISE_TO_DIMENSIONS[key].join(" · ")}</span><span class="best-badge" id="badge-${key}"></span>`;
   card.addEventListener("click", ()=> openInstructions(key));
   grid.appendChild(card);
 });
+
+function updateExerciseGridBadges(){
+  const best = getBestScores(sessionHistory);
+  Object.keys(EXERCISES).forEach(key=>{
+    const el = document.getElementById(`badge-${key}`);
+    if(!el) return;
+    el.textContent = best[key] ? `Best ${best[key].score}` : "";
+  });
+}
 
 function renderHistory(){
   const list = document.getElementById("historyList");
@@ -573,12 +972,13 @@ function renderHistory(){
     list.innerHTML = `<p class="empty-hint">No sessions yet — try your first exercise above.</p>`;
     return;
   }
-  list.innerHTML = sessionHistory.slice(-5).reverse().map(h=>`
+  list.innerHTML = [...sessionHistory].slice(-5).reverse().map(h=>`
     <div class="history-row">
       <span>${h.name}</span>
       <span class="hscore">${h.score}</span>
     </div>
   `).join("");
+  updateExerciseGridBadges();
 }
 
 const DURATION_OPTIONS = [10, 20, 30];
@@ -588,6 +988,7 @@ function openInstructions(key){
   currentExerciseKey = key;
   const ex = EXERCISES[key];
   document.getElementById("instrTitle").textContent = ex.name;
+  document.getElementById("instrDimTag").textContent = EXERCISE_TO_DIMENSIONS[key].join(" · ");
   document.getElementById("instrIcon").innerHTML = ICONS[key];
   document.getElementById("instrBody").textContent = ex.instructions;
 
@@ -647,6 +1048,7 @@ const CONNECTIONS = [
 ];
 
 async function initModel(){
+  const { PoseLandmarker, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14");
   const vision = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
   );
@@ -823,8 +1225,19 @@ function showResult(ex, band){
   ring.style.strokeDasharray = circumference;
   ring.style.strokeDashoffset = offset;
 
-  sessionHistory.push({ name: ex.name, score: band.score, ts: Date.now() });
+  const session = {
+    key: currentExerciseKey,
+    name: ex.name,
+    score: band.score,
+    band: { label: band.label, note: band.note },
+    duration: selectedDuration,
+    ts: Date.now(),
+  };
+  sessionHistory.push(session);
+  persist();
   renderHistory();
+  syncSessionToFirestore(session);
+  checkReminderState();
   showScreen("screen-result");
 }
 
@@ -836,6 +1249,384 @@ document.getElementById("btnRetry").addEventListener("click", async ()=>{
 });
 
 renderHistory();
+
+/* ---------------------------------------------------------------------
+   6. MOBILITY SCORE SCREEN — render, breakdown, trend chart
+--------------------------------------------------------------------- */
+function renderProgressDots(completedKeys){
+  const wrap = document.getElementById("progressDots");
+  wrap.innerHTML = Object.keys(EXERCISES).map(key=>{
+    const done = completedKeys.includes(key);
+    return `<span class="progress-dot ${done?"done":""}" title="${EXERCISES[key].name}${done?" — done":""}"></span>`;
+  }).join("");
+}
+
+function renderBreakdown(bestScores, totalWeight){
+  const list = document.getElementById("breakdownList");
+  list.innerHTML = Object.keys(EXERCISES).map(key=>{
+    const ex = EXERCISES[key];
+    const entry = bestScores[key];
+    if(!entry){
+      return `<div class="breakdown-row breakdown-missing">
+        <span class="breakdown-name">${ex.name}</span>
+        <span class="breakdown-missing-tag">Not yet checked</span>
+      </div>`;
+    }
+    const weightPct = Math.round((SCORE_WEIGHTS[key]/totalWeight)*100);
+    return `<div class="breakdown-row">
+      <span class="breakdown-name">${ex.name}</span>
+      <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="width:${entry.score}%;"></div></div>
+      <span class="breakdown-score">${entry.score}</span>
+      <span class="breakdown-weight">${weightPct}% wt</span>
+    </div>`;
+  }).join("");
+}
+
+function renderDimensions(dimensionScores){
+  const list = document.getElementById("dimensionList");
+  list.innerHTML = DIMENSION_ORDER.map(dimKey=>{
+    const dim = DIMENSIONS[dimKey];
+    const info = dimensionScores[dimKey];
+    if(!info){
+      const needed = dim.keys.map(k=>EXERCISES[k].name).join(", ");
+      return `<div class="breakdown-row breakdown-missing">
+        <span class="breakdown-name">${dim.label}</span>
+        <span class="breakdown-missing-tag">Try: ${needed}</span>
+      </div>`;
+    }
+    return `<div class="breakdown-row">
+      <span class="breakdown-name">${dim.label}</span>
+      <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="width:${info.score}%;"></div></div>
+      <span class="breakdown-score">${info.score}</span>
+      <span class="breakdown-weight">${info.checksCompleted}/${info.totalChecks}</span>
+    </div>`;
+  }).join("");
+}
+
+let chartMode = "daily";
+function renderChartRangeToggle(){
+  const wrap = document.getElementById("chartRangeToggle");
+  wrap.innerHTML = "";
+  [["daily","Day"],["weekly","Week"],["monthly","Month"]].forEach(([key,label])=>{
+    const pill = document.createElement("button");
+    pill.className = "duration-pill" + (chartMode===key ? " active" : "");
+    pill.textContent = label;
+    pill.addEventListener("click", ()=>{
+      chartMode = key;
+      renderChartRangeToggle();
+      updateChart();
+    });
+    wrap.appendChild(pill);
+  });
+}
+
+function updateChart(){
+  const daily = computeDailySnapshots(sessionHistory);
+  const points = aggregateSnapshots(daily, chartMode);
+  renderTrendChart(points, chartMode);
+}
+
+function renderTrendChart(points, mode){
+  const wrap = document.getElementById("chartWrap");
+  if(points.length < 2){
+    wrap.innerHTML = `<p class="empty-hint">Need at least two ${mode} data points to draw a trend line — keep checking in.</p>`;
+    return;
+  }
+  const W = 340, H = 170, padL = 26, padR = 10, padT = 14, padB = 22;
+  const innerW = W-padL-padR, innerH = H-padT-padB;
+  const xFor = i => padL + (points.length===1 ? innerW/2 : (i/(points.length-1))*innerW);
+  const yFor = s => padT + innerH - (Math.max(0,Math.min(100,s))/100)*innerH;
+
+  const gridLines = [0,25,50,75,100].map(v=>{
+    const y = yFor(v);
+    return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#DEDCD3" stroke-width="1"/>
+            <text x="2" y="${y+3}" font-size="9" fill="#5B655F" font-family="Inter,sans-serif">${v}</text>`;
+  }).join("");
+
+  const pathD = points.map((p,i)=>`${i===0?"M":"L"}${xFor(i).toFixed(1)},${yFor(p.score).toFixed(1)}`).join(" ");
+  const dots = points.map((p,i)=>`<circle class="chart-dot" data-i="${i}" cx="${xFor(i).toFixed(1)}" cy="${yFor(p.score).toFixed(1)}" r="4" fill="#1F4C46" stroke="#fff" stroke-width="1.5"/>`).join("");
+
+  const lastIdx = points.length-1;
+  const labelStride = Math.max(1, Math.ceil(points.length/6));
+  const xLabels = points.map((p,i)=>{
+    if(i % labelStride !== 0 && i !== lastIdx) return "";
+    return `<text x="${xFor(i).toFixed(1)}" y="${H-6}" font-size="9" fill="#5B655F" text-anchor="middle" font-family="Inter,sans-serif">${p.label}</text>`;
+  }).join("");
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible;" id="trendSvg">
+      ${gridLines}
+      <path d="${pathD}" fill="none" stroke="#E8A33D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+      ${xLabels}
+      <line id="chartCrosshair" x1="0" y1="${padT}" x2="0" y2="${H-padB}" stroke="#16211D" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+    </svg>
+    <div class="chart-tooltip" id="chartTooltip" style="display:none;"></div>
+  `;
+
+  const svg = document.getElementById("trendSvg");
+  const tooltip = document.getElementById("chartTooltip");
+  const crosshair = document.getElementById("chartCrosshair");
+
+  function showPoint(i){
+    const p = points[i];
+    crosshair.setAttribute("x1", xFor(i));
+    crosshair.setAttribute("x2", xFor(i));
+    crosshair.setAttribute("opacity", "1");
+    tooltip.style.display = "block";
+    tooltip.style.left = (xFor(i)/W*100)+"%";
+    tooltip.style.top = (yFor(p.score)/H*100)+"%";
+    tooltip.textContent = `${p.label} · ${p.score}`;
+  }
+  svg.addEventListener("pointermove", (e)=>{
+    const rect = svg.getBoundingClientRect();
+    const relX = (e.clientX-rect.left)/rect.width*W;
+    let nearest=0, best=Infinity;
+    points.forEach((p,i)=>{ const d=Math.abs(xFor(i)-relX); if(d<best){best=d;nearest=i;} });
+    showPoint(nearest);
+  });
+  svg.addEventListener("pointerleave", ()=>{
+    tooltip.style.display="none";
+    crosshair.setAttribute("opacity","0");
+  });
+  showPoint(lastIdx);
+}
+
+function renderScoreScreen(){
+  const bestScores = getBestScores(sessionHistory);
+  const completedKeys = Object.keys(bestScores);
+
+  const streak = computeStreak(sessionHistory);
+  document.getElementById("streakChip").textContent = streak>0 ? `${streak}-day streak` : "";
+
+  const lockedEl = document.getElementById("scoreLockedState");
+  const unlockedEl = document.getElementById("scoreUnlockedState");
+
+  if(completedKeys.length < MIN_CHECKS_FOR_SCORE){
+    lockedEl.style.display = "flex";
+    unlockedEl.style.display = "none";
+    document.getElementById("checksNeededNum").textContent = MIN_CHECKS_FOR_SCORE - completedKeys.length;
+    renderProgressDots(completedKeys);
+  }else{
+    lockedEl.style.display = "none";
+    unlockedEl.style.display = "flex";
+
+    const result = computeMobilityScore(bestScores);
+    const verdict = getVerdict(result.score);
+
+    document.getElementById("overallScoreNum").textContent = result.score;
+    const ring = document.getElementById("overallScoreRing");
+    const circumference = 2*Math.PI*78;
+    ring.style.strokeDasharray = circumference;
+    ring.style.strokeDashoffset = circumference*(1-result.score/100);
+    ring.style.stroke = verdict.color;
+
+    const badge = document.getElementById("verdictBadge");
+    badge.textContent = verdict.label;
+    badge.className = "badge-verdict badge-"+verdict.key;
+
+    document.getElementById("checksCompletedNote").textContent =
+      completedKeys.length===TOTAL_CHECKS ? `All ${TOTAL_CHECKS} checks completed` : `Based on ${completedKeys.length} of ${TOTAL_CHECKS} checks`;
+
+    document.getElementById("recommendationCard").innerHTML = getRecommendation(bestScores);
+
+    const dimensionScores = computeDimensionScores(bestScores);
+    renderDimensions(dimensionScores);
+    document.getElementById("dimensionRecommendationCard").innerHTML = getDimensionRecommendation(dimensionScores, bestScores);
+
+    renderBreakdown(bestScores, result.totalWeight);
+    renderChartRangeToggle();
+    updateChart();
+  }
+  renderAuthCard();
+}
+
+/* ---------------------------------------------------------------------
+   7. WEEKLY REMINDER LOOP
+   In-app banner whenever it's been 7+ days since the last check-in, plus
+   a browser Notification (only if the user opts in and grants
+   permission) — both driven client-side, re-checked hourly while the
+   app is open. This is intentionally simple: no server/push backend.
+--------------------------------------------------------------------- */
+const REMINDER_DAYS = 7;
+function daysSince(ts){ return (Date.now()-ts)/(1000*60*60*24); }
+
+function checkReminderState(){
+  const banner = document.getElementById("reminderBanner");
+  const textEl = document.getElementById("reminderText");
+  if(!banner || !textEl) return;
+  if(sessionHistory.length===0){ banner.style.display="none"; return; }
+  const lastTs = Math.max(...sessionHistory.map(s=>s.ts));
+  const days = daysSince(lastTs);
+  if(days >= REMINDER_DAYS){
+    textEl.textContent = `It's been ${Math.floor(days)} days since your last mobility check — take a couple of minutes for a quick check-in.`;
+    banner.style.display = "flex";
+    maybeFireNotification();
+  }else{
+    banner.style.display = "none";
+  }
+}
+
+function maybeFireNotification(){
+  if(!("Notification" in window)) return;
+  if(Notification.permission !== "granted") return;
+  const last = storedData.lastReminderNotifiedTs;
+  if(last && daysSince(last) < REMINDER_DAYS) return; // at most one notification per week
+  try{
+    new Notification("Time for your weekly mobility check", {
+      body: "It's been a week — a quick check-in keeps your streak and score accurate.",
+    });
+  }catch(e){ /* Notification constructor can fail in some contexts (e.g. some mobile browsers) — ignore */ }
+  storedData.lastReminderNotifiedTs = Date.now();
+  persist();
+}
+
+document.getElementById("reminderDismiss")?.addEventListener("click", ()=>{
+  document.getElementById("reminderBanner").style.display = "none";
+});
+document.getElementById("reminderEnableNotif")?.addEventListener("click", async ()=>{
+  if(!("Notification" in window)){ alert("Notifications aren't supported in this browser."); return; }
+  const perm = await Notification.requestPermission();
+  if(perm==="granted") checkReminderState();
+});
+
+setInterval(checkReminderState, 60*60*1000); // re-check hourly while the tab is open
+checkReminderState();
+
+/* ---------------------------------------------------------------------
+   8. FIREBASE (Auth + Firestore) — OPTIONAL, SCAFFOLDED
+   Paste your Firebase project config below to turn on cross-device
+   history, Google sign-in, and cloud-backed streaks. Until you do, the
+   app runs fully offline on localStorage only — nothing else breaks.
+
+   Get your config: Firebase console → Project settings → General →
+   "Your apps" → SDK setup and configuration → Config object.
+
+   Suggested Firestore security rules (also in README.md):
+     match /users/{userId}/sessions/{sessionId} {
+       allow read, write: if request.auth != null && request.auth.uid == userId;
+     }
+--------------------------------------------------------------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDLu_RBQi0mVpQHs9X85eXp_kgXelpV7mk",
+  authDomain: "kinelab-mobility-check.firebaseapp.com",
+  projectId: "kinelab-mobility-check",
+  storageBucket: "kinelab-mobility-check.firebasestorage.app",
+  messagingSenderId: "719661859403",
+  appId: "1:719661859403:web:cc88d0280891fd56b403ce",
+};
+const FIREBASE_ENABLED = !!(firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("YOUR_"));
+
+let fbApp=null, fbAuth=null, fbDb=null, fbUser=null, fbModules=null, fbInitFailed=false;
+
+async function initFirebase(){
+  if(!FIREBASE_ENABLED) return;
+  try{
+    const [appMod, authMod, fsMod] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js"),
+      import("https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js"),
+    ]);
+    fbModules = { ...authMod, ...fsMod };
+    fbApp = appMod.initializeApp(firebaseConfig);
+    fbAuth = fbModules.getAuth(fbApp);
+    fbDb = fbModules.getFirestore(fbApp);
+
+    fbModules.onAuthStateChanged(fbAuth, async (user)=>{
+      fbUser = user;
+      if(user) await mergeRemoteHistory();
+      renderAuthCard();
+      const scoreScreenActive = document.getElementById("screen-score").classList.contains("active");
+      if(scoreScreenActive) renderScoreScreen();
+    });
+
+    if(!fbAuth.currentUser){
+      await fbModules.signInAnonymously(fbAuth).catch(err=>console.warn("Anonymous sign-in failed", err));
+    }
+  }catch(err){
+    console.warn("Firebase init failed — continuing in local-only mode.", err);
+    fbInitFailed = true;
+    renderAuthCard();
+  }
+}
+
+async function mergeRemoteHistory(){
+  if(!fbUser || !fbDb || !fbModules) return;
+  try{
+    const sessionsCol = fbModules.collection(fbDb, "users", fbUser.uid, "sessions");
+    const snap = await fbModules.getDocs(fbModules.query(sessionsCol, fbModules.orderBy("ts","asc")));
+    const remote = snap.docs.map(d=>d.data());
+
+    const seen = new Set();
+    const merged = [];
+    [...remote, ...sessionHistory].forEach(s=>{
+      const id = `${s.key}-${s.ts}`;
+      if(seen.has(id)) return;
+      seen.add(id);
+      merged.push(s);
+    });
+    merged.sort((a,b)=>a.ts-b.ts);
+    sessionHistory = merged;
+    persist();
+    renderHistory();
+
+    // push up any local-only sessions the server doesn't have yet
+    const remoteIds = new Set(remote.map(s=>`${s.key}-${s.ts}`));
+    const toUpload = sessionHistory.filter(s=>!remoteIds.has(`${s.key}-${s.ts}`));
+    for(const s of toUpload) await syncSessionToFirestore(s);
+  }catch(err){
+    console.warn("Could not merge remote history.", err);
+  }
+}
+
+async function syncSessionToFirestore(session){
+  if(!FIREBASE_ENABLED || !fbUser || !fbDb || !fbModules) return;
+  try{
+    const id = `${session.key}-${session.ts}`;
+    const ref = fbModules.doc(fbDb, "users", fbUser.uid, "sessions", id);
+    await fbModules.setDoc(ref, session);
+  }catch(err){
+    console.warn("Could not sync session to Firestore.", err);
+  }
+}
+
+async function signInWithGoogle(){
+  if(!FIREBASE_ENABLED || !fbAuth || !fbModules) return;
+  try{
+    const provider = new fbModules.GoogleAuthProvider();
+    await fbModules.signInWithPopup(fbAuth, provider);
+  }catch(err){
+    console.warn("Google sign-in failed.", err);
+    alert("Sign-in was cancelled or failed.");
+  }
+}
+
+function renderAuthCard(){
+  const card = document.getElementById("authCard");
+  if(!card) return;
+  if(!FIREBASE_ENABLED){
+    card.innerHTML = `<p class="empty-hint">Saving on this device only. Add a Firebase config near the bottom of index.html to sync history across devices and enable Google sign-in.</p>`;
+    return;
+  }
+  if(fbInitFailed){
+    card.innerHTML = `<p class="empty-hint">Couldn't reach Firebase right now (offline, or a network/config issue) — saving on this device only. Your history isn't lost; it'll sync next time Firebase is reachable.</p>`;
+    return;
+  }
+  if(!fbUser){
+    card.innerHTML = `<p class="empty-hint">Connecting…</p>`;
+    return;
+  }
+  if(fbUser.isAnonymous){
+    card.innerHTML = `<p class="empty-hint">Syncing as a guest on this device. <button class="link-btn" id="btnGoogleSignIn">Sign in with Google</button> to keep your history across devices.</p>`;
+    document.getElementById("btnGoogleSignIn")?.addEventListener("click", signInWithGoogle);
+  }else{
+    card.innerHTML = `<p class="empty-hint">Synced as ${fbUser.displayName || fbUser.email || "signed-in user"}.</p>`;
+  }
+}
+
+initFirebase();
+renderAuthCard();
+showScreen("screen-home");
 </script>
 </body>
 </html>
